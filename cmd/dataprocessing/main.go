@@ -77,7 +77,15 @@ func initDatabase(ctx context.Context, client *sql.DB) {
 	if err != nil {
 		log.Fatalf("Failed to create table: %v", err)
 	}
-	statement.Exec()
+	defer statement.Close()
+	if _, err := statement.Exec(); err != nil {
+		log.Fatalf("Failed to execute create table: %v", err)
+	}
+
+	// Create index for better query performance
+	if _, err := client.Exec("CREATE INDEX IF NOT EXISTS idx_machine_region ON pricing_history(machine_type, region_name)"); err != nil {
+		log.Printf("Failed to create index: %v", err)
+	}
 
 }
 
