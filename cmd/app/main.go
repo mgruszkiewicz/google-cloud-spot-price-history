@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -11,8 +12,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"gopkg.in/yaml.v3"
 )
-
-var PRICING_DIR = "data/"
 
 type PricingHistory struct {
 	MachineType   string
@@ -24,7 +23,11 @@ type PricingHistory struct {
 }
 
 func main() {
-	db, err := sql.Open("sqlite3", "db.sqlite3")
+
+	database_path := flag.String("dbpath", "db.sqlite3", "Desired location of sqlite3 database")
+	data_path := flag.String("data", "data/", "Location of pricing.yml history files")
+	flag.Parse()
+	db, err := sql.Open("sqlite3", *database_path)
 	if err != nil {
 		log.Fatalf("failed opening connection to sqlite: %v", err)
 	}
@@ -32,14 +35,14 @@ func main() {
 
 	initDatabase(context.Background(), db)
 
-	files, err := os.ReadDir(PRICING_DIR)
+	files, err := os.ReadDir(*data_path)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	for _, file := range files {
-		fmt.Println(file.Name())
-		file_open, _ := os.ReadFile(fmt.Sprintf("%s/%s", PRICING_DIR, file.Name()))
+		fmt.Printf("Processing file %s\n", file.Name())
+		file_open, _ := os.ReadFile(fmt.Sprintf("%s/%s", *data_path, file.Name()))
 		file_content := string(file_open)
 
 		var data map[string]interface{}
@@ -67,7 +70,6 @@ func main() {
 							UpdatedTS:     timestamp,
 							Updated:       updated,
 						}
-						fmt.Println(priceHistoryStruct)
 						if _, err := createPriceHistoryEntry(context.Background(), db, &priceHistoryStruct); err != nil {
 							log.Printf("failed to create price history entry: %v", err)
 						}
@@ -82,7 +84,7 @@ func initDatabase(ctx context.Context, client *sql.DB) {
 	statement, err := client.Prepare("CREATE TABLE IF NOT EXISTS pricing_history (id INTEGER PRIMARY KEY, machine_type varchar(64), region_name varchar(64), hour_price REAL, spot_hour_price REAL, updated_ts INTEGER, updated varchar(64))")
 
 	if err != nil {
-		log.Fatalf("Failed to create table", err)
+		log.Fatalf("Failed to create table: %v", err)
 	}
 	statement.Exec()
 
@@ -90,7 +92,7 @@ func initDatabase(ctx context.Context, client *sql.DB) {
 func createPriceHistoryEntry(ctx context.Context, client *sql.DB, priceHistory *PricingHistory) (bool, error) {
 	statement, err := client.Prepare("INSERT OR IGNORE INTO pricing_history (machine_type, region_name, hour_price, spot_hour_price, updated_ts, updated) VALUES (?, ?, ?, ?, ?, ?)")
 	if err != nil {
-		log.Fatalf("failed to insert new record to pricing_history table", err)
+		log.Fatalf("failed to insert new record to pricing_history table: %v", err)
 		return false, err
 	}
 	statement.Exec(priceHistory.MachineType, priceHistory.RegionName, priceHistory.HourPrice, priceHistory.HourSpotPrice, priceHistory.UpdatedTS, priceHistory.Updated)

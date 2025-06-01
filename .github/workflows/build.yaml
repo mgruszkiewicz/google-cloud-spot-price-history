@@ -1,0 +1,47 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Go
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+
+    - name: Build
+      run: make build
+
+    - name: Test
+      run: make test
+
+    - name: Build database
+      run: make run
+
+    - name: (debug) list dir
+      run: ls -la /tmp/pricing-data
+
+    - name: gzip database
+      run: gzip /tmp/history.sqlite3
+
+    - name: Upload database as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: history.sqlite3
+        path: /tmp/history.sqlite3.gz
+        retention-days: 14
+
+    
+  
