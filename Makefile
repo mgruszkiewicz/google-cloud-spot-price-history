@@ -15,6 +15,7 @@ lint:
 
 build:
 	go build -ldflags="-w -s" -o bin/dataprocessing ./cmd/dataprocessing
+	go build -ldflags="-w -s" -o bin/api ./cmd/api
 
 collect-pricing-data:
 	git clone https://github.com/Cyclenerd/google-cloud-pricing-cost-calculator || true

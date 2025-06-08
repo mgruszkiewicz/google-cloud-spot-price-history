@@ -26,7 +26,7 @@ type PricingHistory struct {
 type MachineType struct {
 	Family      string
 	MachineType string
-	CpuCores    int
+	CpuCores    float64
 	MemoryGB    float64
 }
 
@@ -94,9 +94,9 @@ func initDatabase(ctx context.Context, client *sql.DB) {
 		id INTEGER PRIMARY KEY,
 		family varchar(64),  
 		machine_type varchar(64), 
-		cpu_cores INTEGER, 
+		cpu_cores REAL, 
 		memory_gb REAL, 
-		UNIQUE(family, machine_type, cpu_cores, memory)
+		UNIQUE(family, machine_type, cpu_cores, memory_gb)
 	)`)
 
 	if err != nil {
@@ -152,7 +152,6 @@ func processFile(dataPath, fileName string, db *sql.DB, batchSize int) error {
 		if !ok {
 			continue
 		}
-		fmt.Printf("%s have %d cpus and %d memory\n", machineTypeName, instanceMap["cpu"], instanceMap["ram"])
 
 		costData, ok := instanceMap["cost"].(map[string]interface{})
 		if !ok {
@@ -169,11 +168,32 @@ func processFile(dataPath, fileName string, db *sql.DB, batchSize int) error {
 			hourPrice, priceOk := regionMap["hour"].(float64)
 
 			if spotOk && priceOk {
+				var cpuCores float64
+				var memoryGB float64
+				switch v := instanceMap["ram"].(type) {
+				case int:
+					memoryGB = float64(v)
+				case float64:
+					memoryGB = v
+				default:
+					log.Printf("Warning: Unexpected type for RAM for machine %s: %T. Skipping record.", machineTypeName, v)
+					continue // Skip this record if RAM type is not int or float64
+				}
+				switch v := instanceMap["cpu"].(type) {
+				case int:
+					cpuCores = float64(v)
+				case float64:
+					cpuCores = v
+				default:
+					log.Printf("Warning: Unexpected type for CPU for machine %s: %T. Skipping record.", machineTypeName, v)
+					continue // Skip this record if RAM type is not int or float64
+				}
+
 				machine_types = append(machine_types, MachineType{
-					Family:      strings.SplitAfter(machineTypeName, "-")[0],
+					Family:      strings.Split(machineTypeName, "-")[0],
 					MachineType: machineTypeName,
-					CpuCores:    instanceMap["cpu"].(int),
-					MemoryGB:    instanceMap["ram"].(float64),
+					CpuCores:    cpuCores,
+					MemoryGB:    memoryGB,
 				})
 				records = append(records, PricingHistory{
 					MachineType:   machineTypeName,
@@ -189,8 +209,53 @@ func processFile(dataPath, fileName string, db *sql.DB, batchSize int) error {
 
 	fmt.Printf("Found %d records to insert\n", len(records))
 
+	insertMachineTypeRecordsInBatches(db, machine_types, batchSize)
 	// Insert in batches with transactions
 	return insertRecordsInBatches(db, records, batchSize)
+}
+
+func insertMachineTypeRecordsInBatches(db *sql.DB, records []MachineType, batchSize int) error {
+	for i := 0; i < len(records); i += batchSize {
+		end := i + batchSize
+		if end > len(records) {
+			end = len(records)
+		}
+
+		// Begin transaction for this batch
+		tx, err := db.Begin()
+		if err != nil {
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+
+		stmt, err := tx.Prepare("INSERT OR IGNORE INTO machine_type (family, machine_type, cpu_cores, memory_gb) VALUES (?, ?, ?, ?)")
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to prepare statement: %w", err)
+		}
+
+		for j := i; j < end; j++ {
+			record := records[j]
+			if _, err := stmt.Exec(
+				record.Family,
+				record.MachineType,
+				record.CpuCores,
+				record.MemoryGB,
+			); err != nil {
+				stmt.Close()
+				tx.Rollback()
+				return fmt.Errorf("failed to insert record: %w", err)
+			}
+		}
+
+		stmt.Close()
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("failed to commit transaction: %w", err)
+		}
+
+		fmt.Printf("Inserted batch of %d records\n", end-i)
+	}
+
+	return nil
 }
 
 func insertRecordsInBatches(db *sql.DB, records []PricingHistory, batchSize int) error {
