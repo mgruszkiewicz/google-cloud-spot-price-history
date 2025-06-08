@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -20,6 +21,13 @@ type PricingHistory struct {
 	HourPrice     float64
 	UpdatedTS     int
 	Updated       time.Time
+}
+
+type MachineType struct {
+	Family      string
+	MachineType string
+	CpuCores    int
+	MemoryGB    float64
 }
 
 func main() {
@@ -82,6 +90,23 @@ func initDatabase(ctx context.Context, client *sql.DB) {
 		log.Fatalf("Failed to execute create table: %v", err)
 	}
 
+	statement, err = client.Prepare(`CREATE TABLE IF NOT EXISTS machine_type (
+		id INTEGER PRIMARY KEY,
+		family varchar(64),  
+		machine_type varchar(64), 
+		cpu_cores INTEGER, 
+		memory_gb REAL, 
+		UNIQUE(family, machine_type, cpu_cores, memory)
+	)`)
+
+	if err != nil {
+		log.Fatalf("Failed to create table: %v", err)
+	}
+	defer statement.Close()
+	if _, err := statement.Exec(); err != nil {
+		log.Fatalf("Failed to execute create table: %v", err)
+	}
+
 	// Create index for better query performance
 	if _, err := client.Exec("CREATE INDEX IF NOT EXISTS idx_machine_region ON pricing_history(machine_type, region_name)"); err != nil {
 		log.Printf("Failed to create index: %v", err)
@@ -118,13 +143,16 @@ func processFile(dataPath, fileName string, db *sql.DB, batchSize int) error {
 
 	// Collect all records first
 	var records []PricingHistory
+	var machine_types []MachineType
 	updated := convertTimestampToDate(timestamp).UTC()
 
 	for machineTypeName, instanceData := range instances {
+
 		instanceMap, ok := instanceData.(map[string]interface{})
 		if !ok {
 			continue
 		}
+		fmt.Printf("%s have %d cpus and %d memory\n", machineTypeName, instanceMap["cpu"], instanceMap["ram"])
 
 		costData, ok := instanceMap["cost"].(map[string]interface{})
 		if !ok {
@@ -141,6 +169,12 @@ func processFile(dataPath, fileName string, db *sql.DB, batchSize int) error {
 			hourPrice, priceOk := regionMap["hour"].(float64)
 
 			if spotOk && priceOk {
+				machine_types = append(machine_types, MachineType{
+					Family:      strings.SplitAfter(machineTypeName, "-")[0],
+					MachineType: machineTypeName,
+					CpuCores:    instanceMap["cpu"].(int),
+					MemoryGB:    instanceMap["ram"].(float64),
+				})
 				records = append(records, PricingHistory{
 					MachineType:   machineTypeName,
 					RegionName:    regionName,
