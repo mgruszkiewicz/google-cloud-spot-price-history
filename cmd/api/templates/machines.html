@@ -1,0 +1,7 @@
+<ul class="list-group">
+{{range .Machines}}
+    <li class="list-group-item" hx-get="/compute?region_name={{.RegionName}}&machine_type={{.MachineType}}" hx-target="#price-history">
+        {{.MachineType}}
+    </li>
+{{end}}
+</ul>

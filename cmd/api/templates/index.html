@@ -1,0 +1,37 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Google Cloud Spot Price History</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mt-4">Google Cloud Spot Price History</h1>
+        <div class="row">
+            <div class="col-md-4">
+                <h2>Regions</h2>
+                <select class="form-select" hx-get="/region" hx-trigger="change" hx-target="#machine-types-list" name="region_name">
+                    <option value="">Select a region</option>
+                    {{range .Regions}}
+                    <option value="{{.}}">{{.}}</option>
+                    {{end}}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <h2>Machine Types</h2>
+                <div id="machine-types-list">
+                    <!-- Machine types will be loaded here -->
+                </div>
+            </div>
+            <div class="col-md-4">
+                <h2>Price History</h2>
+                <div id="price-history">
+                    <!-- Price history will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

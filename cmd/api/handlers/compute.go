@@ -17,7 +17,7 @@ func ComputeHandler(q *db.Querier) echo.HandlerFunc {
 		}
 
 		if param.RegionName == "" || param.MachineType == "" {
-			return getMachineTypes(q, c)
+			return c.HTML(http.StatusOK, "")
 		}
 
 		machineData, err := getMachineData(q, param.RegionName, param.MachineType)
@@ -25,24 +25,8 @@ func ComputeHandler(q *db.Querier) echo.HandlerFunc {
 			return c.String(http.StatusInternalServerError, "Failed to query compute history: "+err.Error())
 		}
 
-		return c.JSON(http.StatusOK, machineData)
+		return c.Render(http.StatusOK, "prices.html", machineData)
 	}
-}
-
-func getMachineTypes(q *db.Querier, c echo.Context) error {
-	var machineTypes []string
-	err := q.QueryRows("SELECT DISTINCT(machine_type) FROM pricing_history", func(rows *sql.Rows) error {
-		var machineType string
-		if err := rows.Scan(&machineType); err != nil {
-			return fmt.Errorf("failed to scan distinct machine_types: %w", err)
-		}
-		machineTypes = append(machineTypes, machineType)
-		return nil
-	})
-	if err != nil {
-		return c.String(http.StatusInternalServerError, "Failed to query distinct machine_types: "+err.Error())
-	}
-	return c.JSON(http.StatusOK, MachineTypes{Data: machineTypes})
 }
 
 func getMachineData(q *db.Querier, regionName, machineType string) (Machine, error) {

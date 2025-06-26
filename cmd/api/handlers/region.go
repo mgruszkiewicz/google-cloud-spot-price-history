@@ -17,7 +17,7 @@ func RegionHandler(q *db.Querier) echo.HandlerFunc {
 		}
 
 		if param.RegionName == "" {
-			return getRegions(q, c)
+			return c.HTML(http.StatusOK, "")
 		}
 
 		machines, err := getMachinesByRegion(q, param.RegionName)
@@ -30,23 +30,6 @@ func RegionHandler(q *db.Querier) echo.HandlerFunc {
 			"Machines":  machines,
 		})
 	}
-}
-
-func getRegions(q *db.Querier, c echo.Context) error {
-	var regions []string
-	err := q.QueryRows("SELECT DISTINCT(region_name) FROM pricing_history", func(rows *sql.Rows) error {
-		var region string
-		if err := rows.Scan(&region); err != nil {
-			return fmt.Errorf("failed to scan region: %w", err)
-		}
-		regions = append(regions, region)
-		return nil
-	})
-	if err != nil {
-		return c.String(http.StatusInternalServerError, "Failed to query regions: "+err.Error())
-	}
-
-	return c.JSON(http.StatusOK, Region{Data: regions})
 }
 
 func getMachinesByRegion(q *db.Querier, regionName string) ([]Machine, error) {

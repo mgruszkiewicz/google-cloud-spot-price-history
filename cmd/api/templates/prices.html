@@ -1,0 +1,16 @@
+<table class="table">
+    <thead>
+        <tr>
+            <th>Timestamp</th>
+            <th>Price</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .SpotHourPriceHistory}}
+        <tr>
+            <td>{{.Timestamp}}</td>
+            <td>{{.Price}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
