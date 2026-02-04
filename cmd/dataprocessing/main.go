@@ -207,7 +207,7 @@ func processFile(dataPath, fileName string, db *sql.DB, batchSize int) error {
 		}
 	}
 
-	fmt.Printf("Found %d records to insert\n", len(records))
+	fmt.Printf("Found %d records to process (duplicates will be skipped)\n", len(records))
 
 	insertMachineTypeRecordsInBatches(db, machine_types, batchSize)
 	// Insert in batches with transactions
@@ -252,7 +252,7 @@ func insertMachineTypeRecordsInBatches(db *sql.DB, records []MachineType, batchS
 			return fmt.Errorf("failed to commit transaction: %w", err)
 		}
 
-		fmt.Printf("Inserted batch of %d records\n", end-i)
+		fmt.Printf("Processed batch of %d machine types (new inserted, duplicates ignored)\n", end-i)
 	}
 
 	return nil
@@ -298,7 +298,7 @@ func insertRecordsInBatches(db *sql.DB, records []PricingHistory, batchSize int)
 			return fmt.Errorf("failed to commit transaction: %w", err)
 		}
 
-		fmt.Printf("Inserted batch of %d records\n", end-i)
+		fmt.Printf("Processed batch of %d pricing records (new inserted, duplicates ignored)\n", end-i)
 	}
 
 	return nil
