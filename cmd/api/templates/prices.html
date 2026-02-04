@@ -1,3 +1,7 @@
+<div class="mb-4">
+    <canvas id="priceChart" width="800" height="400"></canvas>
+</div>
+
 <table class="table">
     <thead>
         <tr>
@@ -14,3 +18,59 @@
         {{end}}
     </tbody>
 </table>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    (function() {
+        function initChart() {
+            if (typeof Chart === 'undefined') {
+                setTimeout(initChart, 100);
+                return;
+            }
+            const canvas = document.getElementById('priceChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [{{range .SpotHourPriceHistory}}'{{.Timestamp.Format "2006-01-02"}}',{{end}}],
+                    datasets: [{
+                        label: 'Spot Price ($/hour)',
+                        data: [{{range .SpotHourPriceHistory}}{{.Price}},{{end}}],
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Price History'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return '$' + context.parsed.y.toFixed(4) + '/hour';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toFixed(4);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        initChart();
+    })();
+</script>
